@@ -49,6 +49,80 @@ Players control a growing snake that moves around the screen, eating food items 
 6. **Replay Option:** Players can restart or exit gracefully.
 
 ---
+## 🧠 Class Structure
+
+Below is the detailed breakdown of all the classes implemented in the Snake Game project:
+
+---
+
+### 🧩 1. **Point**
+**Purpose:**  
+Represents a coordinate (**x**, **y**) position on the game grid.
+
+**Key Members:**
+- `int x, y` — stores the coordinate values.  
+- `operator==` — compares two `Point` objects for equality.
+
+---
+
+### 🐍 2. **Snake**
+**Purpose:**  
+Manages the snake’s body structure, direction, and movement logic.
+
+**Key Members:**
+- `deque<Point> body` — stores all body segments of the snake.  
+- `Direction dir` — tracks the current direction of movement.  
+- `move()` — updates the snake’s position, checks for collisions, and handles food consumption.  
+- `changeDir()` — changes the movement direction while preventing direct reversal.
+
+---
+
+### 🍎 3. **Food**
+**Purpose:**  
+Handles the creation and positioning of regular food items on the game board.
+
+**Key Members:**
+- `Point position` — holds the food’s location.  
+- `bool active` — indicates whether the food is currently visible.  
+- `generate()` — randomly generates new food on the board.  
+- `deactivate()` — marks food as consumed.
+
+---
+
+### 💫 4. **BonusFood** *(inherits from `Food`)*
+**Purpose:**  
+Represents a special type of food that offers extra points and appears for a limited time.
+
+**Key Members:**
+- `int timer` — countdown timer before the bonus food disappears.  
+- `activateBonus()` — spawns a bonus food item on the board.  
+- `isExpired()` — checks if the bonus food’s timer has run out.  
+
+---
+
+### 🎮 5. **Game**
+**Purpose:**  
+Serves as the central class managing the entire gameplay — rendering, input, scoring, and state management.
+
+**Key Members:**
+- `Snake snake` — main player object.  
+- `Food food` — standard food item.  
+- `BonusFood bonusFood` — special timed food item.  
+- `int score, highScore` — tracks current and best scores.  
+- `bool gameOver, paused, wallMode` — stores gameplay states.  
+- **Main Methods:**  
+  - `draw()` — renders the game board.  
+  - `input()` — processes player input.  
+  - `update()` — updates the game state per frame.  
+  - `reset()` — restarts the game.  
+  - `run()` — controls the main game loop.  
+
+**Additional Functionality:**  
+Handles leaderboard storage, sound effects, color themes, and game mode (Wall / Portal).
+
+---
+---
+
 
 ## 🏆 Scoring
 
@@ -106,3 +180,4 @@ It demonstrates the use of:
 ---
 
 Would you like me to make this version **more creative** (e.g., for GitHub, with emojis and formatted sections) or keep it **strictly formal** (for academic submission or portfolio)?
+
