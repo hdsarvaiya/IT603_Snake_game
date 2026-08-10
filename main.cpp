@@ -124,10 +124,10 @@ private:
     Direction dir;
 
 public:
-    Snake(int width, int height)
+    Snake(int width, int height, int startOffset = 0)
     {
         dir = RIGHT;
-        int startX = height / 2;
+        int startX = height / 2 + startOffset;
         int startY = width / 2;
         body.clear();
         body.push_back(Point(startX, startY));
@@ -221,10 +221,12 @@ class Game
 private:
     int width, height;
     Snake snake;
+    Snake snake2;
     Food food;
     BonusFood bonusFood;
-    int score, highScore;
+    int score, score2, highScore;
     bool gameOver;
+    string loserMsg;
     bool paused;
     bool wallMode; // true => walls active (death on border), false => portal/wrap-around
 
@@ -255,12 +257,14 @@ private:
     }
 
 public:
-    Game(int w = 60, int h = 22) : width(w), height(h), snake(w, h)
+    Game(int w = 60, int h = 22) : width(w), height(h), snake(w, h, -2), snake2(w, h, 2)
     {
         srand((unsigned)time(nullptr));
         score = 0;
+        score2 = 0;
         highScore = 0;
         gameOver = false;
+        loserMsg = "";
         paused = false;
         wallMode = true; // default, can be changed via setWallMode
 
@@ -319,6 +323,10 @@ public:
                 {
                     buffer += string(GREEN) + "O" + WHITE;
                 }
+                else if (snake2.getHead() == cur)
+                {
+                    buffer += string(GREEN) + "O" + WHITE;
+                }
                 else
                 {
                     bool printed = false;
@@ -331,6 +339,18 @@ public:
                             buffer += string(GREEN) + "o" + WHITE;
                             printed = true;
                             break;
+                        }
+                    }
+                    if (!printed)
+                    {
+                        for (auto &seg : snake2.getBody())
+                        {
+                            if (seg == cur && !(seg == snake2.getHead()))
+                            {
+                                buffer += string(GREEN) + "o" + WHITE;
+                                printed = true;
+                                break;
+                            }
                         }
                     }
                     if (printed)
@@ -376,7 +396,7 @@ public:
         buffer += "\n";
 
         // ----- Scoreboard -----
-        string scoreLine = " Score: " + to_string(score) +
+        string scoreLine = " P1 Score: " + to_string(score) + " | P2 Score: " + to_string(score2) +
                            " | High Score: " + to_string(highScore) +
                            " | Mode: " + (wallMode ? "WALLS" : "PORTAL");
         int pad = max(0, (width - (int)scoreLine.size()) / 2);
@@ -385,7 +405,7 @@ public:
         // ----- Game Over -----
         if (gameOver)
         {
-            string msg = " GAME OVER! Press R to restart or Q to quit ";
+            string msg = " GAME OVER! " + loserMsg + " Press R to restart or Q to quit ";
             int pad2 = max(0, (width - (int)msg.size()) / 2);
             buffer += string(RED) + string(pad2, ' ') + msg + "\n" + RESET;
         }
@@ -431,16 +451,16 @@ public:
                     switch (tolower(key))
                     {
                     case 'w':
-                        snake.changeDir(UP);
+                        snake2.changeDir(UP);
                         break;
                     case 's':
-                        snake.changeDir(DOWN);
+                        snake2.changeDir(DOWN);
                         break;
                     case 'a':
-                        snake.changeDir(LEFT);
+                        snake2.changeDir(LEFT);
                         break;
                     case 'd':
-                        snake.changeDir(RIGHT);
+                        snake2.changeDir(RIGHT);
                         break;
                     case 'r':
                         if (gameOver)
@@ -462,13 +482,31 @@ public:
             return;
 
         // Attempt to move; pass wallMode to snake move
-        if (!snake.move(food, score, width, height, wallMode))
+        bool p1Alive = snake.move(food, score, width, height, wallMode);
+        bool p2Alive = snake2.move(food, score2, width, height, wallMode);
+
+        for (auto &seg : snake2.getBody()) {
+            if (snake.getHead() == seg) p1Alive = false;
+        }
+        for (auto &seg : snake.getBody()) {
+            if (snake2.getHead() == seg) p2Alive = false;
+        }
+        if (snake.getHead() == snake2.getHead()) {
+            p1Alive = false;
+            p2Alive = false;
+        }
+
+        if (!p1Alive || !p2Alive)
         {
-            // collision occurred (either with wall in wallMode or self)
+            // collision occurred
             gameOver = true;
-            if (score > highScore)
-                highScore = score;
-            saveScore(score);
+            if (!p1Alive && !p2Alive) loserMsg = "BOTH PLAYERS LOST!";
+            else if (!p1Alive) loserMsg = "PLAYER 1 LOST!";
+            else loserMsg = "PLAYER 2 LOST!";
+
+            if (score > highScore) highScore = score;
+            if (score2 > highScore) highScore = score2;
+            saveScore(max(score, score2));
 
             // Game over tune
             Beep(400, 180);
@@ -477,21 +515,36 @@ public:
             return;
         }
 
+        deque<Point> combinedBody = snake.getBody();
+        for (auto& p : snake2.getBody()) {
+            combinedBody.push_back(p);
+        }
+
         // If food eaten, spawn a new one (food.deactivate called from move)
         if (!food.isActive())
-            food.generate(snake.getBody(), width, height);
+            food.generate(combinedBody, width, height);
 
         // Rarely spawn bonus food
         if (rand() % 120 == 0 && !bonusFood.isActive())
-            bonusFood.activateBonus(snake.getBody(), width, height);
+            bonusFood.activateBonus(combinedBody, width, height);
 
         // If snake ate bonus food
-        if (bonusFood.isActive() && snake.getHead() == bonusFood.getPos())
+        if (bonusFood.isActive())
         {
-            score += 5;
-            bonusFood.deactivate();
-            Beep(1000, 120);
-            Beep(1300, 100);
+            if (snake.getHead() == bonusFood.getPos())
+            {
+                score += 5;
+                bonusFood.deactivate();
+                Beep(1000, 120);
+                Beep(1300, 100);
+            }
+            else if (snake2.getHead() == bonusFood.getPos())
+            {
+                score2 += 5;
+                bonusFood.deactivate();
+                Beep(1000, 120);
+                Beep(1300, 100);
+            }
         }
 
         // Expire bonus
@@ -501,11 +554,19 @@ public:
 
     void reset()
     {
-        snake = Snake(width, height);
+        snake = Snake(width, height, -2);
+        snake2 = Snake(width, height, 2);
         score = 0;
+        score2 = 0;
         gameOver = false;
+        loserMsg = "";
         paused = false;
-        food.generate(snake.getBody(), width, height);
+        
+        deque<Point> combinedBody = snake.getBody();
+        for (auto& p : snake2.getBody()) {
+            combinedBody.push_back(p);
+        }
+        food.generate(combinedBody, width, height);
         bonusFood.deactivate();
     }
 
@@ -521,7 +582,7 @@ public:
                 draw();
                 input();
                 update();
-                int speed = max(40, 150 - score * 5);
+                int speed = max(40, 150 - max(score, score2) * 5);
                 Sleep(speed);
             }
             else
