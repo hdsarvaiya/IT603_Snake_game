@@ -55,6 +55,23 @@ enum Direction
     RIGHT
 };
 
+// ---------------------------------- Random source ------------------------------------
+// Every random choice the game makes goes through here, so a test can supply its own.
+class RandomSource
+{
+public:
+    virtual ~RandomSource() {}
+    virtual int next(int bound) = 0; // value in [0, bound)
+};
+
+class StdRandom : public RandomSource
+{
+public:
+    int next(int bound) override { return rand() % bound; }
+};
+
+static StdRandom stdRandom;
+
 // -------------------------------------- Food -----------------------------------------
 class Food
 {
@@ -64,7 +81,7 @@ private:
 
 public:
     Food() : active(false) {}
-    void generate(const deque<Point> &snakeBody, int width, int height)
+    void generate(const deque<Point> &snakeBody, int width, int height, RandomSource &rng = stdRandom)
     {
         vector<Point> valid;
         for (int i = 1; i < height - 1; ++i)
@@ -87,7 +104,7 @@ public:
         }
         if (!valid.empty())
         {
-            position = valid[rand() % valid.size()];
+            position = valid[rng.next((int)valid.size())];
             active = true;
         }
     }
@@ -103,9 +120,9 @@ class BonusFood : public Food
 
 public:
     BonusFood() : timer(0) {}
-    void activateBonus(const deque<Point> &snakeBody, int w, int h)
+    void activateBonus(const deque<Point> &snakeBody, int w, int h, RandomSource &rng = stdRandom)
     {
-        generate(snakeBody, w, h);
+        generate(snakeBody, w, h, rng);
         timer = 50;
     }
     bool isExpired() { return --timer <= 0; }
@@ -220,6 +237,7 @@ class Game
 {
 private:
     int width, height;
+    RandomSource &rng;
     Snake snake;
     Food food;
     BonusFood bonusFood;
@@ -255,7 +273,7 @@ private:
     }
 
 public:
-    Game(int w = 60, int h = 22) : width(w), height(h), snake(w, h)
+    Game(int w = 60, int h = 22, RandomSource &rng = stdRandom) : width(w), height(h), rng(rng), snake(w, h)
     {
         srand((unsigned)time(nullptr));
         score = 0;
@@ -265,7 +283,7 @@ public:
         wallMode = true; // default, can be changed via setWallMode
 
         loadLeaderboard();
-        food.generate(snake.getBody(), width, height);
+        food.generate(snake.getBody(), width, height, rng);
 
         // enable ANSI in Windows console for colors
         HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -278,6 +296,11 @@ public:
     }
 
     void setWallMode(bool enabled) { wallMode = enabled; }
+
+    int getScore() const { return score; }
+    bool isGameOver() const { return gameOver; }
+    const Snake &getSnake() const { return snake; }
+    const Food &getFood() const { return food; }
 
     void draw()
     {
@@ -479,11 +502,11 @@ public:
 
         // If food eaten, spawn a new one (food.deactivate called from move)
         if (!food.isActive())
-            food.generate(snake.getBody(), width, height);
+            food.generate(snake.getBody(), width, height, rng);
 
         // Rarely spawn bonus food
-        if (rand() % 120 == 0 && !bonusFood.isActive())
-            bonusFood.activateBonus(snake.getBody(), width, height);
+        if (rng.next(120) == 0 && !bonusFood.isActive())
+            bonusFood.activateBonus(snake.getBody(), width, height, rng);
 
         // If snake ate bonus food
         if (bonusFood.isActive() && snake.getHead() == bonusFood.getPos())
@@ -505,7 +528,7 @@ public:
         score = 0;
         gameOver = false;
         paused = false;
-        food.generate(snake.getBody(), width, height);
+        food.generate(snake.getBody(), width, height, rng);
         bonusFood.deactivate();
     }
 
